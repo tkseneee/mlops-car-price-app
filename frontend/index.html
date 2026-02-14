@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Price Predictor | Azure Functions + Static Web App</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0f;
+            --card: #12121a;
+            --border: #1e1e2e;
+            --text: #e4e4e7;
+            --muted: #71717a;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.15);
+            --green: #22c55e;
+            --green-glow: rgba(34, 197, 94, 0.15);
+            --orange: #f97316;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 0.75rem; }
+
+        .logo-icon {
+            width: 36px; height: 36px;
+            background: var(--accent);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .header h1 { font-size: 1.1rem; font-weight: 600; }
+
+        .badges { display: flex; gap: 0.5rem; }
+
+        .badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        .badge.fn { border-color: rgba(59,130,246,0.3); color: var(--accent); }
+        .badge.swa { border-color: rgba(34,197,94,0.3); color: var(--green); }
+
+        .container { width: 100%; max-width: 720px; padding: 2.5rem 1.5rem; }
+
+        .section-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--orange);
+            margin-bottom: 1rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .field { display: flex; flex-direction: column; gap: 0.4rem; }
+
+        .field label { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+
+        .field input, .field select {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.95rem;
+            padding: 0.7rem 0.9rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .field input:focus, .field select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .field select option { background: var(--card); }
+
+        .predict-btn {
+            width: 100%;
+            padding: 0.85rem;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .predict-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .predict-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .result-panel {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: none;
+        }
+
+        .result-panel.show { display: block; animation: fadeIn 0.3s ease; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .result-row:last-child { border-bottom: none; }
+        .result-label { font-size: 0.85rem; color: var(--muted); }
+        .result-value { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 500; }
+        .result-value.highlight { font-size: 1.3rem; color: var(--green); }
+        .result-value.raw { color: var(--orange); }
+
+        .error-panel {
+            margin-top: 2rem;
+            padding: 1rem 1.5rem;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 12px;
+            color: #ef4444;
+            font-size: 0.9rem;
+            display: none;
+        }
+        .error-panel.show { display: block; animation: fadeIn 0.3s ease; }
+
+        .arch-diagram {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--muted);
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .arch-diagram .hl-fn { color: var(--accent); }
+        .arch-diagram .hl-swa { color: var(--green); }
+        .arch-diagram .hl-ar { color: var(--orange); }
+
+        @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="logo-icon">&#128663;</div>
+            <h1>Car Price Predictor</h1>
+        </div>
+        <div class="badges">
+            <span class="badge fn">Azure Functions</span>
+            <span class="badge swa">Static Web App (GitHub)</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="section-label">// Input Parameters</div>
+
+        <div class="form-grid">
+            <div class="field">
+                <label>Model Year</label>
+                <input type="number" id="year" value="2014" min="1995" max="2025">
+            </div>
+            <div class="field">
+                <label>Present Price (Lakhs)</label>
+                <input type="number" id="present_price" value="6.87" step="0.1" min="0">
+            </div>
+            <div class="field">
+                <label>Kms Driven</label>
+                <input type="number" id="kms_driven" value="42450" step="500" min="0">
+            </div>
+            <div class="field">
+                <label>Owner (Previous)</label>
+                <select id="owner">
+                    <option value="0" selected>0 - First Owner</option>
+                    <option value="1">1 - Second Owner</option>
+                    <option value="2">2 - Third Owner</option>
+                    <option value="3">3 - Fourth+</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Fuel Type</label>
+                <select id="fuel_type">
+                    <option value="Petrol">Petrol</option>
+                    <option value="Diesel" selected>Diesel</option>
+                    <option value="CNG">CNG</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Seller Type</label>
+                <select id="seller_type">
+                    <option value="Dealer" selected>Dealer</option>
+                    <option value="Individual">Individual</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Transmission</label>
+                <select id="transmission">
+                    <option value="Manual" selected>Manual</option>
+                    <option value="Automatic">Automatic</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="predict-btn" id="predictBtn" onclick="predict()">
+            Predict Selling Price
+        </button>
+
+        <div class="result-panel" id="resultPanel">
+            <div class="section-label">// Prediction Result</div>
+            <div class="result-row">
+                <span class="result-label">Raw Model Prediction</span>
+                <span class="result-value raw" id="rawPred">-</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">Lower Bound (40%)</span>
+                <span class="result-value" id="lowerBound">-</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">Upper Bound (100%)</span>
+                <span class="result-value" id="upperBound">-</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">Suggested Selling Price</span>
+                <span class="result-value highlight" id="suggested">-</span>
+            </div>
+        </div>
+
+        <div class="error-panel" id="errorPanel"></div>
+
+        <div class="arch-diagram">
+            <span class="hl-swa">[ Static Web App (GitHub) ]</span>
+            <span class="hl-ar"> --> HTTP POST --> </span>
+            <span class="hl-fn">[ Azure Function /api/predict ]</span>
+            <span class="hl-ar"> --> </span>
+            pipeline.pkl --> prediction
+        </div>
+    </div>
+
+    <script>
+        // https://mlops-predict-cicd-6445.azurewebsites.net/api is replaced by the deploy script with the actual URL
+        var API_BASE = 'https://mlops-predict-cicd-6445.azurewebsites.net/api';
+
+        async function predict() {
+            var btn = document.getElementById('predictBtn');
+            var resultPanel = document.getElementById('resultPanel');
+            var errorPanel = document.getElementById('errorPanel');
+
+            btn.disabled = true;
+            btn.textContent = 'Predicting...';
+            resultPanel.classList.remove('show');
+            errorPanel.classList.remove('show');
+
+            var payload = {
+                Year: parseInt(document.getElementById('year').value),
+                Present_Price: parseFloat(document.getElementById('present_price').value),
+                Kms_Driven: parseInt(document.getElementById('kms_driven').value),
+                Fuel_Type: document.getElementById('fuel_type').value,
+                Seller_Type: document.getElementById('seller_type').value,
+                Transmission: document.getElementById('transmission').value,
+                Owner: parseInt(document.getElementById('owner').value)
+            };
+
+            try {
+                var resp = await fetch(API_BASE + '/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                var data = await resp.json();
+
+                if (data.success) {
+                    document.getElementById('rawPred').textContent = 'Rs.' + data.raw_prediction + ' L';
+                    document.getElementById('lowerBound').textContent = 'Rs.' + data.lower_bound + ' L';
+                    document.getElementById('upperBound').textContent = 'Rs.' + data.upper_bound + ' L';
+                    document.getElementById('suggested').textContent = 'Rs.' + data.suggested_price + ' Lakhs';
+                    resultPanel.classList.add('show');
+                } else {
+                    errorPanel.textContent = 'Error: ' + data.error;
+                    errorPanel.classList.add('show');
+                }
+            } catch (err) {
+                errorPanel.textContent = 'Connection error: ' + err.message;
+                errorPanel.classList.add('show');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Predict Selling Price';
+        }
+    </script>
+</body>
+</html>

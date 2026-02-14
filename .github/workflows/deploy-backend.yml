@@ -1,0 +1,41 @@
+﻿name: Deploy Backend to Azure Functions
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**']
+
+env:
+  FUNCTION_APP_NAME: mlops-predict-cicd-6445
+  RESOURCE_GROUP: rg-mlops-cicd
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    name: Build and Deploy Backend
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Build package
+        run: |
+          cd backend
+          pip install --target=".python_packages/lib/site-packages" -r requirements.txt
+          zip -r ../backend.zip . -x "local.settings.json" "__pycache__/*" ".venv/*"
+
+      - name: Login to Azure
+        uses: Azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Functions
+        run: |
+          az functionapp deployment source config-zip \
+            --name ${{ env.FUNCTION_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --src backend.zip \
+            --build-remote false
